@@ -47,6 +47,20 @@ sumo-gui -n $osmWebWizard_RESULT/Toyama-Station_wihtoutPT/osm.net.xml.gz \
 
 
 
+python3 tools/import/gtfs/gtfs2pt.py -n $osmWebWizard_RESULT/Toyama-Station_wihtoutPT/osm.net.xml.gz \
+ --gtfs $GTFS_Static/gtfs_Schienenfernverkehr.zip --date 20251128 --modes bus \
+ --osm-routes $osmWebWizard_RESULT/Toyama-Station_wihtoutPT/osm_ptlines.xml --repair
+
+# Run the simulation with sumo-gui to visualize the result
+sumo-gui -n $osmWebWizard_RESULT/Toyama-Station_wihtoutPT/osm.net.xml.gz \
+ --additional vtypes.xml,gtfs_pt_stops.add.xml,gtfs_pt_vehicles.add.xml
+
+
+
+
+# echo 2025.11.28. fernverkehr
+cd $GTFS_Static
+wget -O gtfs_Schienenfernverkehr.zip https://gtfs.de/en/feeds/de_fv/
 
 
 

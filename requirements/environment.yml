@@ -1,0 +1,49 @@
+# environment.yml（Python専用）
+
+name: gtfs-sumo-rl
+channels:
+  - conda-forge
+  - pytorch
+dependencies:
+  - python=3.12
+
+  # GTFS processing & Parquet (GTFS処理・Parquet変換)
+  - requests>=2.32.0
+  - pandas>=2.2.0
+  - pyarrow>=17.0.0
+  - polars>=1.0.0
+  - folium>=0.19.0
+
+  # Position/Kalman (位置計算・Kalmanフィルタ)
+  - geopy>=2.4.0
+  - scipy>=1.14.0
+  - numpy>=2.0.0
+
+  # RL environment interface (RL環境インタフェース)
+  - gymnasium>=1.0.0
+
+  # Dev & debugging (開発・デバッグ)
+  - jupyterlab>=4.2.0
+  - ipykernel>=6.29.0
+  - pytest>=8.3.0
+  - black>=24.8.0
+  - ipython
+
+  # Visualization (可視化)
+  - matplotlib>=3.9.0
+  - seaborn>=0.13.2
+  - plotly>=5.24.0
+  
+
+  # pip: TraCI client & RL libs, Plotly export (pip限定パッケージ)
+
+  - pip:
+    - gtfs-realtime-bindings
+    - kaleido>=0.2.1
+    - traci                   # Python client connects to SUMO via TraCI (Python側からSUMOに接続)
+    - sumo-rl>=1.1.0
+    - ray[rllib]>=2.47.0
+    - torch  --index-url https://download.pytorch.org/whl/cu121
+    - torchvision  --index-url https://download.pytorch.org/whl/cu121
+    - torchaudio --index-url https://download.pytorch.org/whl/cu121
+

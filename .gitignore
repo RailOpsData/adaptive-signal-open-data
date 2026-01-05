@@ -59,8 +59,14 @@ flow_output/
 *.pbf
 *.geojson
 
+
+# --- Src ---
+src/sim_bridge/*.html
+src/sim_bridge/iframe_figures/
+
 # --- Script ---
 scripts/archive
+scripts/bin/
 
 # --- Docker related ---
 docker/*.log
@@ -100,6 +106,7 @@ latex_files/build/
 # --- Jupyter / experiments ---
 *.ipynb_checkpoints
 notebooks/.ipynb_checkpoints/
+*.ipynb
 
 .envrc
 
