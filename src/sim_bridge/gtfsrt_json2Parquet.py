@@ -55,16 +55,16 @@ logger = logging.getLogger(__name__)
 def parse_metadata_from_filename(path: Path) -> Dict[str, Union[str, pd.Timestamp]]:
     """Parse agency, feed_type and snapshot timestamp from filename.
 
+    Args:
+        path: Path to the GTFS-RT JSON snapshot file whose filename encodes
+            agency, feed type, and timestamp.
     Expected pattern: gtfs_rt_{feed_type}_{agency}_{YYYYMMDD_HHMMSS}.json
 
-    Args:
-        path: Path to the JSON file.
-
-    Returns:
-        dict with keys: agency, feed_type, snapshot_ts (pd.Timestamp), date_str
-
-    Raises:
-        ValueError: if filename doesn't match expected pattern.
+    Returns keys:
+      - agency
+      - feed_type
+      - snapshot_ts_jst (pd.Timestamp, tz-aware Asia/Tokyo)
+      - date_str_jst (YYYYMMDD string, JST)
     """
     name = path.name
     # try with agency first
@@ -83,11 +83,24 @@ def parse_metadata_from_filename(path: Path) -> Dict[str, Union[str, pd.Timestam
         ts_str = m2.group("ts")
     # ts_str like 20251114_214913
     try:
-        snapshot_ts = pd.to_datetime(ts_str, format="%Y%m%d_%H%M%S")
+        parsed = pd.to_datetime(ts_str, format="%Y%m%d_%H%M%S")
     except Exception as exc:
         raise ValueError(f"Invalid timestamp in filename {name}: {exc}")
-    date_str = snapshot_ts.strftime("%Y%m%d")
-    return {"agency": agency, "feed_type": feed_type, "snapshot_ts": snapshot_ts, "date_str": date_str}
+
+    # Treat filename timestamp as JST for this sim_bridge workflow.
+    if parsed.tzinfo is None:
+        snapshot_ts_jst = parsed.tz_localize("Asia/Tokyo")
+    else:
+        snapshot_ts_jst = parsed.tz_convert("Asia/Tokyo")
+
+    date_str_jst = snapshot_ts_jst.strftime("%Y%m%d")
+
+    return {
+        "agency": agency,
+        "feed_type": feed_type,
+        "snapshot_ts_jst": snapshot_ts_jst,
+        "date_str_jst": date_str_jst,
+    }
 
 
 def infer_agency_from_feed(feed: dict) -> Optional[str]:
@@ -172,8 +185,8 @@ def _empty_trip_updates_df() -> pl.DataFrame:
     """Return an empty trip_updates DataFrame with expected columns."""
     cols = {
         "snapshot_filename": [],
-        "snapshot_ts": [],
-        "date_str": [],
+        "snapshot_ts_jst": [],
+        "date_str_jst": [],
         "agency": [],
         "entity_id": [],
         "trip_id": [],
@@ -192,8 +205,8 @@ def _empty_vehicle_positions_df() -> pl.DataFrame:
     """Return an empty vehicle_positions DataFrame with expected columns."""
     cols = {
         "snapshot_filename": [],
-        "snapshot_ts": [],
-        "date_str": [],
+        "snapshot_ts_jst": [],
+        "date_str_jst": [],
         "agency": [],
         "entity_id": [],
         "vehicle_id": [],
@@ -256,8 +269,8 @@ def load_trip_updates_from_json(path: Path) -> pl.DataFrame:
                 vehicle_id = tu.get("vehicle_id") or (tu.get("vehicle") and (tu.get("vehicle").get("id") if isinstance(tu.get("vehicle"), dict) else None))
             row = {
                 "snapshot_filename": path.name,
-                "snapshot_ts": meta["snapshot_ts"],
-                "date_str": meta["date_str"],
+                "snapshot_ts_jst": meta["snapshot_ts_jst"],
+                "date_str_jst": meta["date_str_jst"],
                 "agency": meta["agency"],
                 "entity_id": None,
                 "trip_id": tu.get("trip_id") if isinstance(tu, dict) else None,
@@ -287,8 +300,8 @@ def load_trip_updates_from_json(path: Path) -> pl.DataFrame:
         vehicle = tu.get("vehicle", {}) or {}
         row = {
             "snapshot_filename": path.name,
-            "snapshot_ts": meta["snapshot_ts"],
-            "date_str": meta["date_str"],
+            "snapshot_ts_jst": meta["snapshot_ts_jst"],
+            "date_str_jst": meta["date_str_jst"],
             "agency": meta["agency"],
             "entity_id": ent.get("id"),
             "trip_id": trip.get("trip_id") if trip else None,
@@ -356,8 +369,8 @@ def load_vehicle_positions_from_json(path: Path) -> pl.DataFrame:
             pos = v.get("position") or {}
             row = {
                 "snapshot_filename": path.name,
-                "snapshot_ts": meta["snapshot_ts"],
-                "date_str": meta["date_str"],
+                "snapshot_ts_jst": meta["snapshot_ts_jst"],
+                "date_str_jst": meta["date_str_jst"],
                 "agency": meta["agency"],
                 "entity_id": None,
                 "vehicle_id": v.get("vehicle_id") or (v.get("vehicle") and v.get("vehicle").get("id")),
@@ -390,8 +403,8 @@ def load_vehicle_positions_from_json(path: Path) -> pl.DataFrame:
         pos = vehicle.get("position") or {}
         row = {
             "snapshot_filename": path.name,
-            "snapshot_ts": meta["snapshot_ts"],
-            "date_str": meta["date_str"],
+            "snapshot_ts_jst": meta["snapshot_ts_jst"],
+            "date_str_jst": meta["date_str_jst"],
             "agency": meta["agency"],
             "entity_id": ent.get("id"),
             "vehicle_id": vehicle.get("vehicle", {}).get("id") if vehicle.get("vehicle") else vehicle.get("id") or vehicle.get("id"),
@@ -442,7 +455,7 @@ def load_all_snapshots(base_dir: Path, feed_type: Literal["trip_updates", "vehic
     for p in files:
         try:
             meta = parse_metadata_from_filename(p)
-            metas.append((p, meta["snapshot_ts"]))
+            metas.append((p, meta["snapshot_ts_jst"]))
         except ValueError:
             logger.warning("Skipping file with invalid filename: %s", p)
             continue
@@ -474,28 +487,25 @@ def load_all_snapshots(base_dir: Path, feed_type: Literal["trip_updates", "vehic
             combined = pl.concat([combined, d], how="vertical")
     return combined
 
-
-def save_to_parquet_partitioned(df: pl.DataFrame, output_base_dir: Path, agency: str, feed_type: str, date_str: str) -> Path:
+def save_to_parquet_partitioned(df: pl.DataFrame, output_base_dir: Path, agency: str, feed_type: str, date_str_jst: str) -> Path:
     """Save given DataFrame as Parquet under output_base_dir/agency/feed_type/date_str.parquet.
 
     Args:
-        df: polars DataFrame to save.
-        output_base_dir: base directory for outputs (e.g., ./data/bronze).
-        agency: agency name used for partitioning.
-        feed_type: 'trip_updates' or 'vehicle_positions'.
-        date_str: YYYYMMDD string.
+        df: Polars DataFrame containing GTFS-RT records to be saved.
+        output_base_dir: Base directory under which parquet files will be written.
+        agency: Agency identifier used as a subdirectory under output_base_dir.
+        feed_type: Feed type (e.g. 'trip_updates' or 'vehicle_positions') used as a subdirectory.
+        date_str_jst: Date string in YYYYMMDD format (JST) used as the parquet filename.
 
     Returns:
-        Path to written Parquet file.
+        Path to the written parquet file.
     """
     out_dir = output_base_dir / agency / feed_type
     out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = out_dir / f"{date_str}.parquet"
-    # Prefer polars write_parquet which uses pyarrow under the hood when available.
+    out_path = out_dir / f"{date_str_jst}.parquet"
     try:
         df.write_parquet(out_path, compression="zstd")
     except Exception:
-        # as a fallback, convert to pandas then to pyarrow
         try:
             df.to_pandas().to_parquet(out_path, compression="zstd", engine="pyarrow")
         except Exception as exc:
@@ -543,18 +553,18 @@ def _group_and_save(df: pl.DataFrame, output_dir: Path, feed_type: str, agency_f
             continue
         if pandas_mode:
             sub = df_for_inspect[df_for_inspect["agency"] == agency]
-            date_strs = sorted(sub["date_str"].dropna().unique())
+            date_strs = sorted(sub["date_str_jst"].dropna().unique())
         else:
             sub = df.filter(pl.col("agency") == agency)
-            date_strs = [d for d in sub.select("date_str").unique().to_series().to_list() if d is not None]
+            date_strs = [d for d in sub.select("date_str_jst").unique().to_series().to_list() if d is not None]
 
         for date_str in date_strs:
             try:
                 if pandas_mode:
-                    part_pd = sub[sub["date_str"] == date_str]
+                    part_pd = sub[sub["date_str_jst"] == date_str]
                     part_pl = pl.from_pandas(part_pd)
                 else:
-                    part_pl = sub.filter(pl.col("date_str") == date_str)
+                    part_pl = sub.filter(pl.col("date_str_jst") == date_str)
 
                 if part_pl.is_empty():
                     continue
