@@ -53,7 +53,7 @@ from keplergl import KeplerGl
 
 
 
-# %% [markdown]
+# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # 1. vehicle_id categorisation 
 #
 #
