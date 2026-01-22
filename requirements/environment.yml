@@ -1,6 +1,6 @@
 # environment.yml（Python専用）
 
-name: gtfs-sumo-rl
+name: headway-optimisation-dev
 channels:
   - conda-forge
   - pytorch
@@ -35,6 +35,7 @@ dependencies:
   - matplotlib>=3.9.0
   - seaborn>=0.13.2
   - plotly>=5.24.0
+  - altair>=5.4.0
   
 
   # pip: TraCI client & RL libs, Plotly export (pip限定パッケージ)
