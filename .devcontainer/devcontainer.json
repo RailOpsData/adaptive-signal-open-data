@@ -1,0 +1,17 @@
+{
+  "name": "Headway Optimisation - Dev Container",
+  "description": "Attach to the 'dev' docker-compose service; provides Python + Jupyter development environment.",
+  "dockerComposeFile": ["../docker/docker-compose.yml"],
+  "service": "dev",
+  "workspaceFolder": "/app",
+  "extensions": [
+    "ms-python.python",
+    "ms-toolsai.jupyter"
+  ],
+  "settings": {
+    "python.defaultInterpreterPath": "/opt/conda/bin/python"
+  },
+  "forwardPorts": [8888],
+  "shutdownAction": "stopCompose",
+  "remoteUser": "appuser"
+}
