@@ -1,23 +1,23 @@
 # docker/Dockerfile.base
 # Common base (Python, pip/poetry, pandas/pyarrow and other dependencies shared across all jobs)
 # Install heavy dependencies once and cache them → subsequent derived images build efficiently
-FROM python:3.12-slim
+FROM mambaorg/micromamba:latest
 
-# Arguments for user/group ID matching host system (WSL environment)
+# Arguments for host-matching user/group IDs (default to 1000)
 ARG APP_UID=1000
 ARG APP_GID=1000
 
-# Python environment settings
+# Python / runtime environment settings
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PATH="/usr/local/bin:${PATH}" \
     TZ=Asia/Tokyo
+
+# Ensure we run package installs as root, then switch to non-root later
+USER root
 
 WORKDIR /app
 
-# OS dependencies (minimal - common for all jobs)
+# Install OS packages required by all derived images
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates \
       curl \
@@ -31,24 +31,35 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
-# Install common Python dependencies (common for all jobs)
-# Install heavy dependencies once here and cache them
-COPY requirements/base.txt /tmp/requirements-base.txt
-RUN python -m pip install --upgrade pip setuptools wheel \
-    && pip install -r /tmp/requirements-base.txt \
-    && rm /tmp/requirements-base.txt
+# Adjust the existing micromamba user to match host UID/GID if present,
+# and provide an `appuser` account for compatibility with downstream Dockerfiles.
+RUN if id -u micromamba >/dev/null 2>&1; then \
+      groupmod -g ${APP_GID} micromamba || true; \
+      usermod -u ${APP_UID} -g ${APP_GID} micromamba || true; \
+    fi \
+    && if ! id -u appuser >/dev/null 2>&1; then \
+      groupadd -g ${APP_GID} appuser || true; \
+      useradd -u ${APP_UID} -g ${APP_GID} -m appuser || true; \
+    fi
 
-# Create working directory structure
-RUN mkdir -p /app/src /app/configs /app/data /app/results /app/logs
+# Copy the project's conda environment definition and create a trimmed
+# variant that excludes heavy, training-only packages to speed up base builds.
+COPY requirements/environment.yml /tmp/environment.yml
 
-# Create non-root user with host-matching UID/GID (WSL environment)
-# NOTE: Do not use chmod 777 or 666.
-# Use proper ownership (chown) and safe permissions instead (chmod 755).
-RUN groupadd -g ${APP_GID} appuser && useradd -u ${APP_UID} -g ${APP_GID} -m appuser \
-    && chown -R appuser:appuser /app
-    
+RUN cp /tmp/environment.yml /tmp/environment.base.yml \
+    && sed -i '/torch\|torchvision\|torchaudio\|ray\[\|sumo-rl/d' /tmp/environment.base.yml
+
+# Install the trimmed environment into the base prefix using micromamba
+RUN micromamba install -y -n base -f /tmp/environment.base.yml \
+    && micromamba clean --all --yes || true \
+    && rm -f /tmp/environment.yml /tmp/environment.base.yml
+
+# Create application folders and fix ownership to the host-matching user
+RUN mkdir -p /app/src /app/configs /app/data /app/results /app/logs \
+    && chown -R ${APP_UID}:${APP_GID} /app
+
+# Switch to the compatibility non-root user used throughout the repo
 USER appuser
 
-
-# Health check port (common)
-EXPOSE 8000
+# Expose common ports (app / Jupyter)
+EXPOSE 8000 8888

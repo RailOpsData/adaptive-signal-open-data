@@ -5,7 +5,18 @@
 x-common-environment: &common-environment
   PYTHONPATH: /app/src
 
+# Build-only service to produce the base runtime image used by derived images.
+# This service is profile-hidden so it does not run by default; run
+# `docker compose build tram-base` to build the base image locally.
 services:
+  tram-base:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.base
+    image: tram-base:latest
+    profiles:
+      - build-base
+      
   # GTFS Static data ingestion (short-lived task)
   gtfs-ingest-static:
     image: tram-ingest:latest
@@ -27,7 +38,7 @@ services:
     command: ["--feed-type", "gtfs_static", "--once"]
     restart: "no"  # Short-lived task
     profiles:
-      - manual  # Run manually or via scheduler
+      - ingest  # Run manually or via scheduler
 
   # GTFS-RT realtime data ingestion (short-lived task)
   gtfs-ingest-realtime:
@@ -48,7 +59,7 @@ services:
     command: ["--feed-type", "realtime", "--once"]
     restart: "no"  # Short-lived task
     profiles:
-      - manual  # Run manually or via scheduler
+      - ingest  # Run manually or via scheduler
 
   # SUMO installation service for building the image
   SUMO-tutorial:
@@ -108,6 +119,24 @@ services:
     #         - driver: nvidia
     #           count: 1
     #           capabilities: [gpu]
+
+  # Development service: mounts project root and starts an interactive
+  # environment (JupyterLab). Port is bound only to localhost for safety.
+  dev:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.dev
+      args:
+        APP_UID: 1000
+        APP_GID: 1000
+    image: tram-dev:latest
+    volumes:
+      - ..:/app:z
+    environment: *common-environment
+    ports:
+      - "127.0.0.1:8888:8888"
+    profiles:
+      - dev
 
 # Volume definitions
 volumes:

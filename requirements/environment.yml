@@ -7,6 +7,13 @@ channels:
 dependencies:
   - python=3.12
 
+  # Dockerfile.dev & debugging (開発・デバッグ)
+  - jupyterlab>=4.2.0
+  - ipykernel>=6.29.0
+  - pytest>=8.3.0
+  - black>=24.8.0
+  - ipython
+
   # GTFS processing & Parquet (GTFS処理・Parquet変換)
   - requests>=2.32.0
   - pandas>=2.2.0
@@ -23,13 +30,6 @@ dependencies:
 
   # RL environment interface (RL環境インタフェース)
   - gymnasium>=1.0.0
-
-  # Dev & debugging (開発・デバッグ)
-  - jupyterlab>=4.2.0
-  - ipykernel>=6.29.0
-  - pytest>=8.3.0
-  - black>=24.8.0
-  - ipython
 
   # Visualization (可視化)
   - matplotlib>=3.9.0

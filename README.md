@@ -4,9 +4,9 @@ A GTFS data collection, analysis, and optimization system designed to reduce tra
 
 ## Overview
 
-- **GTFS Data Collection**: Real-time data acquisition at 20-second intervals
-- **Simulation**: Traffic simulation using SUMO/FLOW
-- **Optimization**: Delay reduction through reinforcement learning and mathematical optimization
+ - **GTFS Data Collection**: Real-time data acquisition at 20-second intervals
+ - **Simulation**: Optional external traffic simulation tools (not included)
+ - **Optimization**: Delay reduction through optimization and experimental methods
 
 ## Quick Start
 
@@ -63,18 +63,24 @@ adaptive-signal-open-data/
 ├── logs/                   # Runtime and ingestion logs
 ├── requirements/           # Python dependency lockfiles per component
 ├── results/                # Analysis outputs, evaluation artefacts
-├── reveal-slides/          # Presentation material (assets, slide decks)
+ 
 ├── scripts/                # Operational utilities (schedulers, helpers)
 ├── src/                    # Application source code
 │   ├── gtfs_pipeline/      # GTFS ingestion CLI, config, persistence glue
-│   ├── sim_bridge/         # Interfaces bridging to SUMO/FLOW simulations
+│   ├── sim_bridge/         # Interfaces bridging to external simulators
 │   └── training/           # RL/optimisation experiments and notebooks
 ├── Makefile                # Top-level automation and shortcuts
 ├── README.md
 └── http-server.log         # Local dev HTTP server output (optional)
 ```
 
-<small>Note: Auxiliary directories such as `.github/` (CI configuration) and `venv/` (local virtual environment) are created only when needed.</small>
+<small>Note: Some auxiliary or runtime directories are not tracked as part of the repository by default and are created or populated when needed. Examples include:
+- `.github/` — CI configuration and workflow files maintained by the project or created when enabling CI.
+- `logs/`, `data/bronze/`, `data/raw/`, `results/` — created and populated by ingestion, runtime tasks, or analysis jobs.
+- `docker/` build artifacts or temporary files — produced when building container images or running compose flows.
+
+Treat these directories as local/runtime artifacts. Use the container-based development workflow described above to keep environments reproducible and avoid committing local-only artifacts.
+</small>
 
 ## Key Features
 
@@ -84,12 +90,12 @@ adaptive-signal-open-data/
 - **Storage**: Local filesystem
 
 ### Simulation
-- **Engine**: SUMO/FLOW
-- **Purpose**: Traffic flow simulation
+- **Engine**: Optional external traffic simulators (not included)
+- **Purpose**: Traffic flow simulation (external tools)
 - **Output**: Delay analysis results
 
 ### Optimization
-- **Methods**: Reinforcement learning (Q-DDQN), mathematical optimization
+- **Methods**: Optimization and experimental methods (no specific model is assumed)
 - **Goal**: Delay reduction
 - **Output**: Optimized operation plans
 
@@ -157,6 +163,100 @@ tail -f logs/scheduler-realtime.log
 
 ## Development
 
+### Container-based development (start from the container)
+
+This project is designed to be developed from within a containerized development environment. The instructions below cover common, reproducible workflows: opening the repository in VS Code (Dev Containers), starting JupyterLab from a container, running and attaching to containers via the Docker CLI, and using Jupytext to pair/sync notebooks with text files.
+
+Prerequisites
+- Docker or Podman installed and usable by your user (or via sudo).
+- VS Code with the "Dev Containers" (Remote - Containers) extension for container attach workflows.
+- A container image with project dependencies (or use a Python base image and install requirements inside the container).
+
+Open the repository in VS Code (recommended)
+- In VS Code: open Command Palette -> "Dev Containers: Open Folder in Container..." and choose the workspace folder.
+- If you prefer the CLI, create and run a development container and then attach from VS Code:
+
+```bash
+# Quick dev container (one-off) — mounts repo and opens an interactive shell
+docker run --rm -it \
+	-v "$(pwd)":/workspace -w /workspace \
+	--name as-dev python:3.11-slim /bin/bash
+
+# Attach to a running container from VS Code: Command Palette -> Remote-Containers: Attach to Running Container...
+```
+
+Docker CLI: run and exec examples
+- Run an interactive shell inside a temporary container that mounts the repository:
+
+```bash
+docker run --rm -it -v "$(pwd)":/app -w /app python:3.11-slim /bin/bash
+```
+
+- Start a named container (so you can re-attach) and keep it running:
+
+```bash
+docker run -d --name as-dev -v "$(pwd)":/app -w /app python:3.11-slim tail -f /dev/null
+
+# Attach a shell to the running container
+docker exec -it as-dev /bin/bash
+```
+
+JupyterLab in a container
+- If you want to start JupyterLab directly from a container image that has dependencies installed:
+
+```bash
+docker run --rm -p 8888:8888 -v "$(pwd)":/workspace -w /workspace python:3.11-slim \
+	bash -lc "pip install -r requirements/ingest.txt && jupyter lab --no-browser --ip=0.0.0.0 --allow-root"
+```
+
+- If a container is already running and contains the environment, start JupyterLab inside it:
+
+```bash
+docker exec -it as-dev bash -lc "jupyter lab --no-browser --ip=0.0.0.0 --allow-root --NotebookApp.token=''"
+```
+
+Note: binding ports and the token configuration above are examples for local development only. Protect Jupyter instances if they are reachable from other hosts.
+
+Using Jupytext (pairing notebooks with text files)
+- Install Jupytext in the container environment (once):
+
+```bash
+pip install jupytext
+```
+
+- Pair an existing notebook with a light-weight Python script (one-time pairing):
+
+```bash
+jupytext --set-formats ipynb,py notebooks/example.ipynb
+```
+
+- Sync between paired formats (keeps both files updated):
+
+```bash
+jupytext --sync notebooks/example.ipynb
+```
+
+- Recommended Git workflow: commit both the .py/.md text version and the .ipynb (or choose to commit only the text form). A minimal `.jupytext.toml` to keep ipynb <-> py pairing by convention:
+
+```toml
+[jupytext]
+formats = "ipynb,py:percent"
+default_jupytext_formats = "ipynb,py:percent"
+```
+
+Activating the virtual environment inside the container
+- If you use micromamba (scripts/install_micromamba.sh is provided), activate the environment inside the container:
+
+```bash
+# example (after micromamba environment creation)
+micromamba activate myenv
+```
+
+Quick tips
+- If you use `docker compose` for local dev, prefer `docker compose run --service-ports` or `docker compose up` and then `docker exec -it <service> /bin/bash` to attach.
+- Keep long-running dev containers named (e.g. `as-dev`) so you can re-attach and keep caches installed across sessions.
+- For reproducibility, document the image name and tag used for development in `dev/` or in the `docker/` folder.
+
 ### Adding Dependencies
 ```bash
 # Common for all jobs
@@ -187,5 +287,4 @@ Pull requests and issue reports are welcome.
 
 ## References
 
-- [GTFS Specification](https://developers.google.com/transit/gtfs)
-- [SUMO Official Documentation](https://sumo.dlr.de/docs/)
+ - [GTFS Specification](https://developers.google.com/transit/gtfs)
