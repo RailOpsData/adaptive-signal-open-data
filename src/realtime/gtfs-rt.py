@@ -23,7 +23,7 @@ pl.Config.set_tbl_rows(1000)
 # %% [markdown]
 # # 1. vehicle_positionsの読み込み
 
-# %% [markdown]
+# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # ## 1.1. データ前処理
 #    - 車両idと取得時間で並べ替え
 #    - 取得時間6～9時台
@@ -41,7 +41,7 @@ df = df.sort(df["vehicle_id","snapshot_ts"]).filter(pl.col("snapshot_ts").dt.hou
 df
 
 
-# %% [markdown]
+# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # ## 1.2. vehicle_idの種類と個数確認
 
 # %%
@@ -172,7 +172,7 @@ print(df_t["vehicle_id"].value_counts().sort("vehicle_id"))
 print(df_filtered["vehicle_id"].value_counts().sort("vehicle_id")) #(3.1.実行後に比較のため追加)
 # print(df_t["snapshot_ts"].value_counts())
 
-# %% [markdown]
+# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # 3. vehicle_id追加処理および重複カウントと削除
 
 # %% [markdown] jp-MarkdownHeadingCollapsed=true
@@ -273,7 +273,7 @@ df_vt_sorted = df_vt.sort(["vehicle_id","snapshot_ts"]) #sortしないと前後�
 # %% [markdown]
 # route_idがnullの当該行とその前後1行に該当するものにfilter
 
-# %%
+# %% jupyter={"source_hidden": true, "outputs_hidden": true}
 df_check = df_vt_sorted.filter(
     pl.col("route_id").is_null() |           # 当該行がnull
     pl.col("route_id").shift(-1).over("vehicle_id").is_null() | # 次の行がnull（＝自分はnullの直前）
@@ -281,7 +281,7 @@ df_check = df_vt_sorted.filter(
 )
 df_check.select(["current_stop_sequence","vehicle_id","route_id"]) #(2550,3)
 
-# %% [markdown] jp-MarkdownHeadingCollapsed=true
+# %% [markdown]
 # ### 前後でroute_idが一致すればその値で補完：補完済データは**df_imputed**に代入される
 
 # %%
@@ -304,7 +304,7 @@ df_imputed #(8532,11)
 rate = df_imputed["route_id"].null_count() / len(df_imputed)
 print(f"route_idの欠損率: {rate:.2%}") #(16.63%)
 
-# %% [markdown] jp-MarkdownHeadingCollapsed=true
+# %% [markdown]
 # ### ここまでで補完しきれなかったデータ
 # 1. 各車両IDの一番初めの行と一番最後の行
 # 2. 南富山方面への運用に入るもの（trip_updateの時点で除外しているため）
@@ -330,7 +330,7 @@ df_ch2.sort(pl.col(["vehicle_id","snapshot_ts"])) #(1496,6)
 # %%
 df_ch2["vehicle_id"].value_counts().sort("vehicle_id") #(17,2)
 
-# %% [markdown] jp-MarkdownHeadingCollapsed=true
+# %% [markdown]
 # ### ルート情報（route_id）が欠損している行の車両ID(vehicle_id)の数ならびに該当する行
 
 # %%
@@ -341,7 +341,7 @@ df_ch3 #(1419,11)
 # %%
 df_ch3["vehicle_id"].value_counts().sort("vehicle_id") #(13,2)
 
-# %% [markdown] jp-MarkdownHeadingCollapsed=true
+# %% [markdown]
 # ### ルート情報(route_id)が欠損している行を削除
 
 # %%
@@ -371,7 +371,7 @@ df_rt.select(["snapshot_ts","vehicle_id","lat","lon","current_stop_sequence","ro
 # %% [markdown]
 # # 5. GTFS-JPと結合(2.0.6.のroute_idが抽出された静的時刻表データを利用)
 
-# %% [markdown] jp-MarkdownHeadingCollapsed=true
+# %% [markdown]
 # ## 5.1. (GTFS-JP)route_idの抽出・
 # ルート情報(route_id)内、ルートにおける幾つめの停車駅か？(stop_sequence)、電停名(stop_name)の組み合わせの数
 
@@ -385,9 +385,10 @@ df_st =df_st.unique(subset=["route_id","stop_sequence","stop_name"],keep="first"
 df_st #(349,3)
 
 # %% [markdown] jp-MarkdownHeadingCollapsed=true
-# ## 5.2. （GTFS-JP）富山駅から大学前までに絞り込み
+# ## 5.2. （GTFS-JP）富山駅から大学前までに絞り込み(stop_sequence)(df_st_uni)
 # ルート(route_id)、ルートにおける幾つめの駅か？(stop_sequence)、駅名(stop_name)
 # ここには別系統の環状線も含まれる
+# #### "6.7."でも位置情報から求めた最寄駅のルートにおける幾つめの停車駅か？(current_stop_sequence_right)を生成するために利用
 
 # %%
 df_st_uni = df_st.filter(
@@ -404,8 +405,8 @@ df_st_uni = df_st.filter(
 )
 df_st_uni #(85,3)
 
-# %% [markdown]
-# ## 5.3. GTFS-rt(convined)とGTFS-JPの結合(df_merged):"6.2."でも利用
+# %% [markdown] jp-MarkdownHeadingCollapsed=true
+# ## 5.3. GTFS-rt(df_rt)とGTFS-JP(df_st_uni)の結合(df_merged):"6.2."でも利用
 
 # %%
 df_merged = df_rt.join(
@@ -458,7 +459,7 @@ df_calc_base = df_coords.join(df_lat_lon, how="cross")
 df_calc_base = df_calc_base.select(pl.col(["lat","stop_lat","lon","stop_lon","stop_name"])) #並べ替え
 df_calc_base #(19816,5)
 
-# %% [markdown]
+# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # ## 6.4. 各駅との距離を計算 
 
 # %% jupyter={"outputs_hidden": true}
@@ -500,7 +501,7 @@ df_nearest_stop = (
 
 # 結果の表示
 df_nearest_stop = df_nearest_stop.select(pl.col(["lat","lon","stop_name","distance_m"]))
-df_nearest_stop.rename({"stop_name":"nearest_stop"})
+df_nearest_stop = df_nearest_stop.rename({"stop_name":"nearest_stop"})
 df_nearest_stop
 
 # %% [markdown]
@@ -513,5 +514,197 @@ df_merged_neareststop = df_merged.join(
     how = "inner"
 )
 df_merged_neareststop #(2954,15)になれば"5.3."との整合性がとれていることになる
+
+# %% [markdown]
+# ## 6.7. 位置情報ベースのcurrent_stop_sequenceに変更するためにGTFS-JPのstop_sequenceを結合
+
+# %% jupyter={"outputs_hidden": true}
+df_merged_neareststop_stopsequence_right = df_merged_neareststop.join(
+    df_st_uni,
+    left_on = ["route_id","nearest_stop"],
+    right_on = ["route_id","stop_name"],
+    how = "left"
+)
+df_result = df_merged_neareststop_stopsequence_right.select(
+    pl.exclude(["current_stop_sequence", "stop_name"])
+)
+df_result = df_result.rename({"stop_sequence":"current_stop_sequence_loc"})
+df_result #(2954,15)
+
+# %% [markdown]
+# ## 6.8. 時間順に並べて新しい便になったタイミングを特定
+# - 条件A：シーケンスが若返った＝そのルートの終着駅に到着して、次の運用に就いた
+# - 条件B：違う運用として車両が戻ってきて、数え始める駅が異なった
+
+# %% jupyter={"outputs_hidden": true}
+
+df_with_trip_count = df_result.sort(["vehicle_id", "snapshot_ts"]).with_columns(
+    (
+        # 条件A: シーケンスが若返った
+        (pl.col("current_stop_sequence_loc") < pl.col("current_stop_sequence_loc").shift(1)) |
+        # 条件B: シーケンスが大きく飛んだ
+        ((pl.col("current_stop_sequence_loc") - pl.col("current_stop_sequence_loc").shift(1)).abs() > 5)
+    )  
+    .over("vehicle_id")
+    .fill_null(True)
+    .cast(pl.Int32)
+    .cum_sum()
+    .over("vehicle_id")
+    .alias("trip_count")
+)
+df_with_trip_count #(2954,15)
+
+# %% [markdown]
+# ## 6.9. 「車両」「便番号」「シーケンス番号」の3つでグループ化
+# #### 「〇便目の〇番目の駅」ごとに、最も近づいた瞬間を取得
+# - 車両が混ざらないように車両IDを並べ替え第一優先にする
+# - 同じ運用内での最寄り駅との距離を見るために便番号を第二優先にする
+# - 停車駅の順番は上記の中であれば一意に昇順であるはずなので、時間的なソートにもなる
+
+# %% jupyter={"outputs_hidden": true}
+df_final_approach = (
+    df_with_trip_count.sort("distance_m")
+    .group_by(["vehicle_id", "trip_count", "current_stop_sequence_loc"])
+    .first()
+    .sort(pl.col(["vehicle_id","snapshot_ts"]))
+    .select(pl.col(["trip_count","vehicle_id","snapshot_ts","lat","lon","route_id","nearest_stop","current_stop_sequence_loc","distance_m"]))
+)
+df_final_approach #(429,9)
+
+# %% [markdown]
+# # 7. 各駅の時刻表作成
+
+# %% [markdown] jp-MarkdownHeadingCollapsed=true
+# ## 7.1. route_idからdirection_idを正規表現で抽出
+# 違う方向は当然別でカウントする必要があるため
+
+# %%
+df_with_direction = df_final_approach.with_columns(
+    pl.col("route_id")
+    .str.extract(r"(\d)$")  # 末尾の数字(\d)を抽出
+    .cast(pl.Int32)         # 数値として扱いたい場合はキャスト
+    .alias("direction_id")
+)
+df_with_direction 
+
+# %% [markdown]
+# ## 7.2. 補完しなくてはいけない(駅から50m離れているものが最寄となっている）行
+
+# %% [markdown] jp-MarkdownHeadingCollapsed=true
+# ### 7.2.1. 要補完の行をboolean型で整理
+
+# %%
+df_with_context = df_with_direction.with_columns(
+    (
+        (pl.col("distance_m") >= 50)  # 本来の条件
+        # |                      
+        # (pl.col("distance_m") >= 50).shift(1).fill_null(False) |  # 1行後ろも含める
+        # (pl.col("distance_m") >= 50).shift(-1).fill_null(False)   # 1行前も含める
+    ).alias("required_componsation") # ← 条件全体のカッコを閉じてから alias を指定
+)
+
+# df_with_context
+df_with_context["required_componsation"].value_counts()
+
+# %% [markdown]
+# ### 7.2.2. 要補完の行を並べ替えて出力
+
+# %% jupyter={"outputs_hidden": true}
+df_with_context.filter(pl.col(["required_compensation"])).sort(pl.col(["vehicle_id","snapshot_ts"]))
+
+# %% [markdown]
+# ## 7.3. distanceが50m以上のものとその前後の行
+
+# %% [markdown]
+# ### 7.3.1. 要補完の前後の行のboolean型も追加
+
+# %%
+df_with_context_adjacent = df_with_context.with_columns(
+    (
+        (pl.col("distance_m") >= 50)  # 本来の条件
+        |                      
+        (pl.col("distance_m") >= 50).shift(1).over("vehicle_id").fill_null(False) |  # 1行後ろも含める
+        (pl.col("distance_m") >= 50).shift(-1).over("vehicle_id").fill_null(False)   # 1行前も含める
+    ).alias("is_target_context") # ← 条件全体のカッコを閉じてから alias を指定
+)
+
+# df_with_context
+df_with_context_adjacent["is_target_context"].value_counts()
+
+# %% [markdown]
+# ### 7.3.2. 要補完の前後の行を並べ替えて出力
+
+# %% jupyter={"outputs_hidden": true}
+df_with_context_adjacent.filter(pl.col(["is_target_context"])).sort(pl.col(["vehicle_id","snapshot_ts"]))
+
+# %% [markdown]
+# ## 7.4. distance_mが50m以内のものを選定
+
+# %% jupyter={"outputs_hidden": true}
+df_with_direction.filter(pl.col("distance_m") < 50)
+
+# %% [markdown]
+# ## 7.5. 時刻表示用に変更、方向ID(direction_id)で位置情報データを分類
+
+# %% jupyter={"outputs_hidden": true}
+df_with_direction = df_with_direction.with_columns(
+    pl.col("snapshot_ts").dt.strftime("%H:%M:%S").alias("time_str")
+)
+
+direction_map = {1: "daigakumae", 2: "toyamaSta"}
+dfs = {
+    name: df_with_direction.filter(pl.col("direction_id") == id)
+    for id, name in direction_map.items()
+}
+
+
+dfs
+
+# %%
+
+# 1. 各便の「基準駅（ここでは丸の内）」の通過時刻を抽出
+departure_times = (
+    dfs["daigakumae"]
+    .filter(pl.col("nearest_stop") == "丸の内")
+    .select(["vehicle_id", "trip_count", "snapshot_ts"])
+    .rename({"snapshot_ts": "standard_departure_time"})
+)
+
+# 2. 元のデータに基準時刻を紐付ける
+dfs_with_standard_time = dfs["daigakumae"].join(
+    departure_times, 
+    on=["vehicle_id", "trip_count"], 
+    how="left"
+)
+
+# # 3. 基準時刻で全体をソート
+# # これにより、ピボットした際に左から右へ時間が流れるようになります
+# df_sorted = df_with_standard_time.sort("standard_departure_time")
+
+# 4. df_sorted を使ってピボットを実行
+timetable = df_with_direction.pivot(
+    values="time_str",
+    index=["vehicle_id", "trip_count","direction_id"],
+    on="nearest_stop",
+    aggregate_function="first"
+)
+
+# # 5. 正しい駅順（マスタ）のリストでソート
+# stop_order = [
+#     "富山駅", "新富町", "県庁前", "丸の内", "諏訪川原", "安野屋", 
+#     "トヨタモビリティ富山Gスクエア五福前", "富山大学前"
+# ]
+
+# order_map = {s: i for i, s in enumerate(stop_order)}
+
+# timetable = timetable.with_columns(
+#     pl.col("nearest_stop").replace(order_map).alias("_order")
+# ).sort("_order").drop("_order")
+
+# 結果表示
+timetable = timetable.filter(pl.col("direction_id")==1).sort(pl.col("新富町"))
+
+# %%
+timetable.write_csv("timetable_daigakumae.csv")
 
 # %%
